@@ -13,15 +13,46 @@
 			}
 
 			#oldie { background-color: #ddd !important }
+            
+            #dropdown{
+                width:200px;
+                background:#222;
+                margin:20px;
+            }
+
+            #dropdown li{
+                font-family:sans-serif;
+              padding:3px 10px 3px 30px;
+               color:white;
+                cursor:pointer;
+            }
+            #dropdown li:hover{
+                background-color:blue !important;
+            }
+
+            #dropdown li.checked{
+                background:url(http://cdn1.iconfinder.com/data/icons/fatcow/16x16_0020/accept.png) 0 5px no-repeat;
+            }
+            
+            #gui { position: absolute; top: 0px; left: 100px }
+
+            
 		</style>
 	</head>
 	<body>
+        
+         
+         
 
+        
 		<script src="libs/three.min.js"></script>
 
 		<script src="js/Detector.js"></script>
         <script src="libs/TrackballControls.js"></script>
         <script src="js/controls/OrbitControls.js"></script>
+        <script src='js/libs/dat.gui.min.js'></script>
+        <script src='gui.js'></script>
+    
 
 		<script>
 
@@ -38,12 +69,15 @@
 			var rollOverMesh, rollOverMaterial;
 			var cubeGeo, cubeMaterial;
             var objArray;
+            var currBlockType = 'brick';
 
 			var objects = [];
             
-
+             var color = {'brick': true, 'wood':false};
 			init();
 			render();
+            
+           
             
             function createArray(length)
             {
@@ -56,6 +90,12 @@
                 }
 
                 return arr;
+            }
+            
+            function openWindow()
+            {
+                
+                window.open('file2.html');
             }
             
             function createButton(name, text, width, height, top, left)
@@ -76,12 +116,16 @@
                 return button;
             }
             
+            
+            
 			function init() {
+                mouseTemp = new THREE.Vector2(0, 0);
+                container = document.createElement( 'div' );
+				document.body.appendChild( container );
                 
                // objArray = createArray(30, 30, 30);
                 objArray = [];
-				container = document.createElement( 'div' );
-				document.body.appendChild( container );
+				
 
 				var info = document.createElement( 'div' );
 				info.style.position = 'absolute';
@@ -90,7 +134,13 @@
 				info.style.textAlign = 'center';
 				info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> - voxel painter - webgl<br><strong>click</strong>: add voxel, <strong>shift + click</strong>: remove voxel';
 				container.appendChild( info );
-
+                
+                var link = document.createElement( 'div');
+                link.innerHTML = '<a href="javascript:openWindow();">CLICK ME</a>';
+                container.appendChild(link);
+                
+                
+                
 				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000 );
 				camera.position.set( 500, 800, 1300 );
 				camera.lookAt( new THREE.Vector3() );
@@ -165,6 +215,18 @@
                 // controls
                 controls = new THREE.OrbitControls(camera);
                 controls.target.set(0,0,0);
+                
+                // gui
+                
+                setUpGui();
+                
+                
+                
+                //stats = new Stats();
+				//stats.domElement.style.position = 'absolute';
+				//stats.domElement.style.top = '0px';
+				//container.appendChild( stats.domElement );
+
 
 				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
 				document.addEventListener( 'mousedown', onDocumentMouseDown, false );
@@ -172,25 +234,49 @@
 				document.addEventListener( 'keyup', onDocumentKeyUp, false );
                 document.addEventListener( 'mouseup', onDocumentMouseUp, false );
                 document.addEventListener( 'mousewheel', onDocumentWheel, false);
+                document.addEventListener( 'drop', onDrop, false);
+                document.addEventListener( 'dragover', onDragOver, false);
                 
-                var exportButton = createButton("export", "Export Map", 50, 50, -100, -100);
+                // Buttons
+                
+                var exportButton = createButton("export", "Export Map", 50, 50, -window.innerHeight/2 + 25, window.innerWidth/2 - 125);
                 exportButton.addEventListener('click', onExportClick);
                 
                 document.addEventListener( )
                 
 
 				//
+                
+                //update();
 
 				window.addEventListener( 'resize', onWindowResize, false );
 
 			}
             
+            /*
+            function update()
+            {
+                for (var property in color)
+                {
+                    if (color.property == 
+                }
+                requestAnimationFrame(update);
+            }
+            */
+            
             function onExportClick()
             {
-                var jsonArray = JSON.parse(JSON.stringify(objArray));
+                //var jsonArray = JSON.parse(JSON.stringify(objArray));
+                
+                saveJSON();
                 
                 //console.log(jsonArray.toString);
                 
+            }
+            
+            function onDragOver(event)
+            {
+                event.preventDefault();
             }
             
             function onDocumentWheel( event )
@@ -211,13 +297,14 @@
 
 			function onDocumentMouseMove( event ) {
 
-				event.preventDefault();
+				//event.preventDefault();
 
                 
 				
                 mouse.set( ( event.clientX / window.innerWidth ) * 2 - 1, - ( event.clientY / window.innerHeight ) * 2 + 1 );
                 
-                
+                mouseTemp.x += mouse.x;
+                mouseTemp.y += mouse.y;
                 
                 isMouseMove = true;
                 
@@ -250,7 +337,7 @@
                 isMouseDown = true;
                 isMouseMove = false;
                 
-                mouseTemp = new THREE.Vector2(mouse.x, mouse.y);
+                mouseTemp = new THREE.Vector2(0, 0);
 
 				
 
@@ -266,6 +353,8 @@
 				raycaster.setFromCamera( mouse, camera );
 
 				var intersects = raycaster.intersectObjects( objects );
+                
+                //console.log(mouseTemp.length())
 
 				if ( intersects.length > 0 ) {
 
@@ -284,19 +373,19 @@
 						}
 
 					// create cube
-
+                        
 					} else {
-                        if (!isMouseMove)
+                        if (mouseTemp.length() <= 3)
                         {
                             var voxel = new THREE.Mesh( cubeGeo, cubeMaterial );
-                            console.log(intersect.face.normal);
-                            console.log(intersect.point);
+                            //console.log(intersect.face.normal);
+                            //console.log(intersect.point);
                             //console.log(intersect.point.add(intersect.face.normal));
                             voxel.position.copy( intersect.point ).add( intersect.face.normal );
-                            console.log(voxel.position);
+                            //console.log(voxel.position);
 
                             voxel.position.divideScalar( 50 ).floor().multiplyScalar( 50 ).addScalar( 25 );
-                            console.log(voxel.position);
+                            //console.log(voxel.position);
                             scene.add( voxel );
 
                             objects.push( voxel );
@@ -315,7 +404,7 @@
 
 				switch( event.keyCode ) {
 
-					case 16: isShiftDown = true; break;
+					case 16: isShiftDown = true; color.red = false; break;
 
 				}
                 
@@ -333,6 +422,66 @@
                 render();
 
 			}
+            
+            function onDrop(event) {
+				event.preventDefault();
+				for(var i = 0; i < event.dataTransfer.files.length; i++){
+					var file	= event.dataTransfer.files[i];
+					var reader	= new FileReader();
+					reader.onload = function (event){
+						var dataUri	= event.target.result;
+						var base64	= dataUri.match(/[^,]*,(.*)/)[1];
+						var json	= window.atob(base64);
+						loadJSON( json )
+					};
+					reader.readAsDataURL(file);
+				}
+			}
+            
+            function saveJSON() {
+				var children	= scene.children;
+				var voxels	= [];
+				for( var i = 0; i < children.length; i++ ) {
+					var child	= children[i];
+					if( child instanceof THREE.Mesh === false )			continue;
+					if( child.geometry instanceof THREE.CubeGeometry === false )	continue;
+					if( child === rollOverMesh )					continue;
+					voxels.push({
+						x	: (child.position.x - 25) / 50,
+						y	: (child.position.y - 25) / 50,
+						z	: (child.position.z - 25) / 50,
+						//t	: child.materials[0]._cubeType
+					});
+				}
+				
+				// open a window with the json
+				var dataUri	= "data:application/json;charset=utf-8,"+JSON.stringify(voxels);
+				window.open( dataUri, 'mywindow' );
+			}
+            
+            function loadJSON(mapJSON) {
+				// delete all cubes
+				var children	= scene.children.slice(0);
+				for( var i = 0; i < children.length; i++ ) {
+					if( children[i] instanceof THREE.Mesh === false ) continue;
+					if( children[i].geometry instanceof THREE.CubeGeometry === false ) continue;
+					if( children[i] === rollOverMesh ) continue;
+					scene.remove( children[i] );
+				}				
+				// push new cubes
+				var voxels	= JSON.parse(mapJSON);
+				for( var i = 0; i < voxels.length; i++ ){
+					var voxel = voxels[i];
+					var mesh = new THREE.Mesh( cubeGeo, cubeMaterial );
+					mesh.position.x = voxel.x * 50 + 25;
+					mesh.position.y = voxel.y * 50 + 25;
+					mesh.position.z = voxel.z * 50 + 25;
+					mesh.matrixAutoUpdate = true;
+					mesh.updateMatrix();
+					scene.add( mesh );
+					
+				}
+			}
 
 			function render() {
                 
@@ -340,7 +489,7 @@
                 controls.update();
                 
                 
-                console.log(isShiftDown);
+                //console.log(isShiftDown);
                 
                 if (isShiftDown)
                     rollOverMesh.visible = false;

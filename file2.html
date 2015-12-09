@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>three.js webgl - interactive - voxel painter</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<style>
+			body {
+				font-family: Monospace;
+				background-color: #f0f0f0;
+				margin: 0px;
+				overflow: hidden;
+			}
+
+			#oldie { background-color: #ddd !important }
+            
+            #instructions {
+				width: 100%;
+				height: 100%;
+				display: -webkit-box;
+				display: -moz-box;
+				display: box;
+				-webkit-box-orient: horizontal;
+				-moz-box-orient: horizontal;
+				box-orient: horizontal;
+				-webkit-box-pack: center;
+				-moz-box-pack: center;
+				box-pack: center;
+				-webkit-box-align: center;
+				-moz-box-align: center;
+				box-align: center;
+				color: #ffffff;
+				text-align: center;
+				cursor: pointer;
+			}
+            
+		</style>
+	</head>
+	<body>
+        
+         
+        
+		<script src="libs/three.min.js"></script>
+        
+        <script src='js/libs/dat.gui.min.js'></script>
+        <script src='js/renderers/Projector.js'></script>
+        <script src='Three.FirstPersonControls.js'></script>
+        <script src='js/controls/PointerLockControls.js'></script>
+        <script src='jquery-1.7.2.min.js'></script>
+
+
+        <div id="blocker">
+
+			<div id="instructions">
+				<span style="font-size:40px">Click to play</span>
+				<br />
+				(W, A, S, D = Move, SPACE = Jump, MOUSE = Look around)
+			</div>
+
+		</div>
+        
+		<script>
+
+			//if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
+            
+            var clock = new THREE.Clock();
+			var container;
+            
+            var isMouseDown = false, isMouseMove = false;
+			var camera, renderer;
+			var plane, cube;
+			var raycaster, isShiftDown = false;
+
+			var rollOverMesh, rollOverMaterial;
+			var cubeGeo, cubeMaterial;
+            var objArray;
+
+			var objects = [];
+            
+            var WIDTH = window.innerWidth,
+            HEIGHT = window.innerHeight,
+            ASPECT = WIDTH / HEIGHT,
+            UNITSIZE = 250,
+            WALLHEIGHT = UNITSIZE / 3,
+            MOVESPEED = 100,
+            LOOKSPEED = 0.075,
+            BULLETMOVESPEED = MOVESPEED * 5,
+            NUMAI = 5,
+            PROJECTILEDAMAGE = 20;
+            
+            // Global vars
+            var t = THREE, scene, cam, renderer, controls, projector, model, skin;
+            var runAnim = true, mouse = { x: 0, y: 0 }, kills = 0, health = 100;
+            var healthCube, lastHealthPickup = 0;
+            var mapW = 1000, mapH = 1000;
+            
+            var moveForward = false;
+			var moveBackward = false;
+			var moveLeft = false;
+			var moveRight = false;
+			var canJump = false;
+            
+            var controlsEnabled = false;
+            
+            var prevTime = performance.now();
+			var velocity = new THREE.Vector3();
+            
+            var havePointerLock = 'pointerLockElement' in document || 'mozPointerLockElement' in document || 'webkitPointerLockElement' in document;
+			if ( havePointerLock ) {
+				var element = document.body;
+				var pointerlockchange = function ( event ) {
+					if ( document.pointerLockElement === element || document.mozPointerLockElement === element || document.webkitPointerLockElement === element ) {
+						controlsEnabled = true;
+						controls.enabled = true;
+					} else {
+						controls.enabled = false;
+						console.log("This doesn't work");
+                        instructions.style.display = 'initial';
+					}
+				};
+                
+                var pointerlockerror = function ( event ) {
+					instructions.style.display = '';
+				};
+                
+                document.addEventListener( 'pointerlockchange', pointerlockchange, false );
+				document.addEventListener( 'mozpointerlockchange', pointerlockchange, false );
+				document.addEventListener( 'webkitpointerlockchange', pointerlockchange, false );
+                
+                document.addEventListener( 'pointerlockerror', pointerlockerror, false );
+				document.addEventListener( 'mozpointerlockerror', pointerlockerror, false );
+				document.addEventListener( 'webkitpointerlockerror', pointerlockerror, false );
+                
+                instructions.addEventListener( 'click', function ( event ) {
+					instructions.style.display = 'none';
+					// Ask the browser to lock the pointer
+					element.requestPointerLock = element.requestPointerLock || element.mozRequestPointerLock || element.webkitRequestPointerLock;
+					if ( /Firefox/i.test( navigator.userAgent ) ) {
+						var fullscreenchange = function ( event ) {
+							if ( document.fullscreenElement === element || document.mozFullscreenElement === element || document.mozFullScreenElement === element ) {
+								document.removeEventListener( 'fullscreenchange', fullscreenchange );
+								document.removeEventListener( 'mozfullscreenchange', fullscreenchange );
+								element.requestPointerLock();
+							}
+						};
+						document.addEventListener( 'fullscreenchange', fullscreenchange, false );
+						document.addEventListener( 'mozfullscreenchange', fullscreenchange, false );
+						element.requestFullscreen = element.requestFullscreen || element.mozRequestFullscreen || element.mozRequestFullScreen || element.webkitRequestFullscreen;
+						element.requestFullscreen();
+					} else {
+						element.requestPointerLock();
+					}
+				}, false );
+                
+            }
+            else
+                console.log("This doesn't work 2");
+            
+            
+            
+            
+            
+            
+
+            
+            
+			init();
+			//render();
+            
+            
+           
+            
+			function init() {
+                mouseTemp = new THREE.Vector2(0, 0);
+                container = document.createElement( 'div' );
+				document.body.appendChild( container );
+                
+               // objArray = createArray(30, 30, 30);
+                objArray = [];
+				
+                projector = new t.Projector(); // Used in bullet projection
+                
+				
+                scene = new THREE.Scene();
+                
+				// Set up camera
+                cam = new t.PerspectiveCamera(60, ASPECT, 1, 10000); // FOV, aspect, near, far
+                cam.position.y = UNITSIZE * .2;
+                scene.add(cam);
+
+				
+                
+                scene.fog = new t.FogExp2(0xD6F1FF, 0.0005); // color, density
+                
+                // Camera moves with mouse, flies around with WASD/arrow keys
+                
+                /*
+                controls = new t.FirstPersonControls(cam);
+                controls.movementSpeed = MOVESPEED;
+                controls.lookSpeed = LOOKSPEED;
+                controls.lookVertical = true; // Temporary solution; play on flat surfaces only
+                controls.noFly = true;
+*/
+                controls = new THREE.PointerLockControls( cam );
+				scene.add( controls.getObject() );
+                
+                var axis = new THREE.AxisHelper();
+                scene.add(axis);
+                
+
+				// cubes
+
+				cubeGeo = new THREE.BoxGeometry( 50, 50, 50 );
+				cubeMaterial = new THREE.MeshLambertMaterial( { color: 0xfeb74c, shading: THREE.FlatShading, map: THREE.ImageUtils.loadTexture( "textures/white-bricks.jpg" ) } );
+
+				
+
+				// plane
+                /*
+				raycaster = new THREE.Raycaster();
+				mouse = new THREE.Vector2();
+
+				var geometry = new THREE.PlaneBufferGeometry( 1000, 1000 );
+				geometry.rotateX( - Math.PI / 2 );
+
+				plane = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial() );
+				scene.add( plane );
+
+				objects.push( plane );
+                */
+                
+                
+                raycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, - 1, 0 ), 0, 10 );
+                setupScene();
+
+				// Lights
+
+				var ambientLight = new THREE.AmbientLight( 0x606060 );
+				scene.add( ambientLight );
+
+				var directionalLight = new THREE.DirectionalLight( 0xffffff );
+				directionalLight.position.set( 1, 1.75, 0.5 ).normalize();
+				scene.add( directionalLight );
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				//renderer.setClearColor( 0xf0f0f0 );
+				//renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+                
+                // controls
+                //controls = new THREE.OrbitControls(camera);
+                //controls.target.set(0,0,0);
+                
+                //stats = new Stats();
+				//stats.domElement.style.position = 'absolute';
+				//stats.domElement.style.top = '0px';
+				//container.appendChild( stats.domElement );
+
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+				document.addEventListener( 'mousedown', onDocumentMouseDown, false );
+				document.addEventListener( 'keydown', onDocumentKeyDown, false );
+				document.addEventListener( 'keyup', onDocumentKeyUp, false );
+                document.addEventListener( 'mouseup', onDocumentMouseUp, false );
+                //document.addEventListener( 'mousewheel', onDocumentWheel, false);
+                //document.addEventListener( 'drop', onDrop, false);
+                //document.addEventListener( 'dragover', onDragOver, false);
+                
+                
+                
+                document.addEventListener( )
+                
+
+				//
+
+				//window.addEventListener( 'resize', onWindowResize, false );
+                render();
+
+			}
+            
+            // Set up the objects in the world
+            function setupScene() {
+                var UNITSIZE = 250,  units = mapW;
+
+                // Geometry: floor
+                var floor = new t.Mesh(
+                        new t.CubeGeometry(units * UNITSIZE, 10, units * UNITSIZE),
+                        new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')})
+                );
+                scene.add(floor);
+
+                // Geometry: walls
+                var cube = new t.CubeGeometry(500, 75, 500);
+                var materials = [
+                                 new t.MeshLambertMaterial({/*color: 0x00CCAA,*/map: t.ImageUtils.loadTexture('images/wall-1.jpg')}),
+                                 new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/wall-2.jpg')}),
+                                 new t.MeshLambertMaterial({color: 0xFBEBCD}),
+                                 ];
+                
+                var mesh = new t.Mesh(cube, materials[0]);
+                scene.add(mesh);
+                
+                // load json, material based on t
+
+                
+            }
+            
+            
+
+			
+           
+            
+            var mouseTemp;
+			function onDocumentMouseDown( event ) {
+
+				event.preventDefault();
+                
+                
+
+				
+
+			}
+            
+            function onDocumentMouseUp( event ) {
+                
+                event.preventDefault();
+                
+                console.log("hello world");
+
+				
+            }
+
+			function onDocumentKeyDown( event ) {
+                
+				switch ( event.keyCode ) {
+						case 38: // up
+						case 87: // w
+							moveForward = true;
+							break;
+						case 37: // left
+						case 65: // a
+							moveLeft = true; break;
+						case 40: // down
+						case 83: // s
+							moveBackward = true;
+							break;
+						case 39: // right
+						case 68: // d
+							moveRight = true;
+							break;
+						case 32: // space
+							if ( canJump === true ) velocity.y += 350;
+							canJump = false;
+							break;
+					}
+                
+                //render();
+
+			}
+
+			function onDocumentKeyUp( event ) {
+                switch( event.keyCode ) {
+						case 38: // up
+						case 87: // w
+							moveForward = false;
+							break;
+						case 37: // left
+						case 65: // a
+							moveLeft = false;
+							break;
+						case 40: // down
+						case 83: // s
+							moveBackward = false;
+							break;
+						case 39: // right
+						case 68: // d
+							moveRight = false;
+							break;
+					}
+
+               // render();
+
+			}
+            
+          
+
+
+			function render() {
+                
+                //var delta = clock.getDelta(), speed = delta * BULLETMOVESPEED;
+                //var aispeed = delta * MOVESPEED;
+                //controls.update(delta); // Move camera
+                
+                if ( controlsEnabled ) {
+                   
+					raycaster.ray.origin.copy( controls.getObject().position );
+					raycaster.ray.origin.y -= 10;
+					var intersections = raycaster.intersectObjects( objects );
+					var isOnObject = intersections.length > 0;
+					var time = performance.now();
+					var delta = ( time - prevTime ) / 1000;
+					velocity.x -= velocity.x * 10.0 * delta;
+					velocity.z -= velocity.z * 10.0 * delta;
+					velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+                    
+                    //console.log(moveForward);
+                    
+					if ( moveForward ) velocity.z -= 1000.0 * delta;
+					if ( moveBackward ) velocity.z += 1000.0 * delta;
+					if ( moveLeft ) velocity.x -= 1000.0 * delta;
+					if ( moveRight ) velocity.x += 1000.0 * delta;
+					if ( isOnObject === true ) {
+						velocity.y = Math.max( 0, velocity.y );
+						canJump = true;
+					}
+                    
+                    //console.log(velocity);
+                    
+					controls.getObject().translateX( velocity.x * delta );
+					controls.getObject().translateY( velocity.y * delta );
+					controls.getObject().translateZ( velocity.z * delta );
+					if ( controls.getObject().position.y < 10 ) {
+						velocity.y = 0;
+						controls.getObject().position.y = 10;
+						canJump = true;
+					}
+					prevTime = time;
+				}
+
+                requestAnimationFrame( render );
+				renderer.render( scene, cam );
+
+			}
+            
+            
+            
+            
+            function onDocumentMouseMove(e) {
+                e.preventDefault();
+                mouse.x = (e.clientX / WIDTH) * 2 - 1;
+                mouse.y = - (e.clientY / HEIGHT) * 2 + 1;
+            }
+
+            // Handle window resizing
+            $(window).resize(function() {
+                WIDTH = window.innerWidth;
+                HEIGHT = window.innerHeight;
+                ASPECT = WIDTH / HEIGHT;
+                if (cam) {
+                    cam.aspect = ASPECT;
+                    cam.updateProjectionMatrix();
+                }
+                if (renderer) {
+                    renderer.setSize(WIDTH, HEIGHT);
+                }
+                //$('#intro, #hurt').css({width: WIDTH, height: HEIGHT,});
+            });
+
+            // Stop moving around when the window is unfocused (keeps my sanity!)
+            $(window).focus(function() {
+                if (controls) controls.freeze = false;
+            });
+            $(window).blur(function() {
+                if (controls) controls.freeze = true;
+            });
+
+            //Get a random integer between lo and hi, inclusive.
+            //Assumes lo and hi are integers and lo is lower than hi.
+            function getRandBetween(lo, hi) {
+             return parseInt(Math.floor(Math.random()*(hi-lo+1))+lo, 10);
+            }
+
+		</script>
+
+	</body>
+</html>
