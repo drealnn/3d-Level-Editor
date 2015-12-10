@@ -29,7 +29,7 @@
 				-webkit-box-align: center;
 				-moz-box-align: center;
 				box-align: center;
-				color: #000000;
+				color: #ffffff;
 				text-align: center;
 				cursor: pointer;
 			}
@@ -48,7 +48,6 @@
         <script src='js/controls/PointerLockControls.js'></script>
         <script src='libs/cannon.min.js'></script>
         <script src='jquery-1.7.2.min.js'></script>
-        <script src="libs/physi.js"></script>
 
 
         <div id="blocker">
@@ -92,7 +91,6 @@
             
             // Global vars
             var t = THREE, scene, cam, renderer, controls, projector, model, skin;
-            var p = Physijs;
             var runAnim = true, mouse = { x: 0, y: 0 }, kills = 0, health = 100;
             var healthCube, lastHealthPickup = 0;
             var mapW = 1000, mapH = 1000;
@@ -112,14 +110,6 @@
             
             var prevTime = performance.now();
 			var velocity = new THREE.Vector3();
-            
-            var materials = [
-                                 new t.MeshLambertMaterial({/*color: 0x00CCAA,*/map: t.ImageUtils.loadTexture('textures/white-bricks.jpg')}),
-                                 new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/ground.jpg')}),
-                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/wood.jpg')}),
-                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/stone.png')}),
-                                 new t.MeshLambertMaterial({color: 0xFBEBCD}),
-                                 ];
             
             var havePointerLock = 'pointerLockElement' in document || 'mozPointerLockElement' in document || 'webkitPointerLockElement' in document;
 			if ( havePointerLock ) {
@@ -179,18 +169,13 @@
             
 
             var voxelArray = window.opener.voxels;
-            var spawnPoint = window.opener.spawnBlock.position;
-            
-            
-            Physijs.scripts.worker = 'libs/physijs_worker.js';
-            Physijs.scripts.ammo = 'ammo.js';
             
 			init();
 			//render();
             
             
             
-            var playerObject;
+            
 			function init() {
                 mouseTemp = new THREE.Vector2(0, 0);
                 container = document.createElement( 'div' );
@@ -202,13 +187,11 @@
                 projector = new t.Projector(); // Used in bullet projection
                 
 				
-                scene = new p.Scene();
+                scene = new THREE.Scene();
                 
 				// Set up camera
                 cam = new t.PerspectiveCamera(60, ASPECT, 1, 10000); // FOV, aspect, near, far
                 cam.position.y = UNITSIZE * .2;
-                
-                
                 scene.add(cam);
 
 				
@@ -217,35 +200,42 @@
                 
                 // Camera moves with mouse, flies around with WASD/arrow keys
                 
-        
+                /*
+                controls = new t.FirstPersonControls(cam);
+                controls.movementSpeed = MOVESPEED;
+                controls.lookSpeed = LOOKSPEED;
+                controls.lookVertical = true; // Temporary solution; play on flat surfaces only
+                controls.noFly = true;
+*/
                 controls = new THREE.PointerLockControls( cam );
-                controls.getObject().position.x = spawnPoint.x;
-                controls.getObject().position.z = spawnPoint.z;
 				scene.add( controls.getObject() );
                 
                 var axis = new THREE.AxisHelper();
                 scene.add(axis);
-            
                 
 
 				// cubes
 
 				cubeGeo = new THREE.BoxGeometry( 50, 50, 50 );
 				cubeMaterial = new THREE.MeshLambertMaterial( { color: 0xfeb74c, shading: THREE.FlatShading, map: THREE.ImageUtils.loadTexture( "textures/white-bricks.jpg" ) } );
+
+				
+
+				// plane
+                /*
+				raycaster = new THREE.Raycaster();
+				mouse = new THREE.Vector2();
+
+				var geometry = new THREE.PlaneBufferGeometry( 1000, 1000 );
+				geometry.rotateX( - Math.PI / 2 );
+
+				plane = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial() );
+				scene.add( plane );
+
+				objects.push( plane );
+                */
                 
-                // tie physijs object to camera
                 
-                scene.simulate();
-                playerObject = new p.BoxMesh(cubeGeo,
-                                        new p.createMaterial(new t.MeshBasicMaterial({color:'green'}), .4, .8) );
-                
-                playerObject.position.y += 100;
-                
-                scene.add(playerObject);
-                
-                //controls.getObject().add(playerObject);
-                
-                // Set up raycaster for jumping
                 raycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, - 1, 0 ), 0, 10 );
                 setupScene();
 
@@ -259,10 +249,14 @@
 				scene.add( directionalLight );
 
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
-				
+				//renderer.setClearColor( 0xf0f0f0 );
+				//renderer.setPixelRatio( window.devicePixelRatio );
 				renderer.setSize( window.innerWidth, window.innerHeight );
 				container.appendChild( renderer.domElement );
-            
+                
+                // controls
+                //controls = new THREE.OrbitControls(camera);
+                //controls.target.set(0,0,0);
                 
                 //stats = new Stats();
 				//stats.domElement.style.position = 'absolute';
@@ -281,13 +275,12 @@
                 
                 
                 
-                
+                console.log(bodyArray[0].position);
                 
 
 				//
 
 				//window.addEventListener( 'resize', onWindowResize, false );
-                
                 render();
 
 			}
@@ -298,42 +291,98 @@
                 //meshArray.push(5);
                 var UNITSIZE = 250,  units = mapW;
                 
+                world = new CANNON.World();
+                world.gravity.set( 0, -9.8, 0 );
+                world.broadphase = new CANNON.NaiveBroadphase();
+                world.solver.iterations = 10;
+                
+
+                // ground plane
+                var basicMaterial = new CANNON.Material();
+                var groundShape =new CANNON.Box( new CANNON.Vec3( 2000, 10, 2000 ) );
+		              
+                var groundBody = new CANNON.Body( {mass:0} );
+                groundBody.addShape(groundShape);
+                
+                groundBody.position.y += 10;
+                groundBody.position.x = 0;
+                groundBody.position.z = 0;
+                
+                //groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),Math.PI/2);
+                
                 
 
                 // Geometry: floor
-                var floor = new p.BoxMesh(
+                var floor = new t.Mesh(
                         new t.CubeGeometry(2000, 10, 2000),
-                        new p.createMaterial( new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}), .4, .8 ), 0
+                        new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')})
                 );
                 scene.add(floor);
                 
+                //console.log(groundBody.quaternion);
                 
-        
+                //groundBody.quaternion.set(0,1,0,1);
+                //console.log(groundBody.quaternion);
+                
+                world.addBody(groundBody);
+                
+                groundBody.addEventListener('collide', function(this_object) 
+		{
+			
+            console.log("Collision detected");
+		});		
+
                 // Geometry: walls
                 var cube = new t.CubeGeometry(50, 50, 50);
-                
+                var materials = [
+                                 new t.MeshLambertMaterial({/*color: 0x00CCAA,*/map: t.ImageUtils.loadTexture('images/wall-1.jpg')}),
+                                 new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/wall-2.jpg')}),
+                                 new t.MeshLambertMaterial({color: 0xFBEBCD}),
+                                 ];
                 
                 for( var i = 0; i < voxelArray.length; i++ ){
 					var voxel = voxelArray[i];
-					
-                    if (voxel.t != 4)
-                    {
-                        var mesh = new p.BoxMesh( cube, new p.createMaterial(materials[voxel.t], .4, .8), 0 ) ;
-
-                        mesh.position.x = voxel.x * 50 + 25;
-                        mesh.position.y = voxel.y * 50 + 25;
-                        mesh.position.z = voxel.z * 50 + 25;
-                        mesh.matrixAutoUpdate = true;
-                        mesh.updateMatrix();
-                        meshArray.push(mesh);
-                        scene.add( mesh );
-                    }
+					var mesh = new THREE.Mesh( cube, materials[0] );
+					mesh.position.x = voxel.x * 50 + 25;
+					mesh.position.y = voxel.y * 50 + 25;
+					mesh.position.z = voxel.z * 50 + 25;
+					mesh.matrixAutoUpdate = true;
+					mesh.updateMatrix();
+                    meshArray.push(mesh);
+					scene.add( mesh );
                     
+                    cannonShape = new CANNON.Box( new CANNON.Vec3( 50, 50, 50 ) );
+		              cannonBody = new CANNON.Body( {mass:1} );
+		              cannonBody.addShape( cannonShape );
+                    cannonBody.mesh = mesh; 
+                    
+                    cannonBody.position.set(mesh.position.x, mesh.position.y, mesh.position.z);
+                    console.log(cannonBody.position);
+                    body = cannonBody;
+                    console.log(cannonBody.position);
+                    world.addBody(cannonBody);
+                    console.log(body.position);
+                    bodyArray.push(cannonBody);
+                    
+                     console.log(body.position);
+                    
+                    world.step( 10 );
+                    console.log(body.position);
 					
-                } // end for
+				}
+                
+                
+                
+                    
+                    
+                   
+                    
+                
+                
+                // load json, material based on t
 
                 
-            } // end function
+            }
             
             
 
@@ -431,7 +480,7 @@
 					var delta = ( time - prevTime ) / 1000;
 					velocity.x -= velocity.x * 10.0 * delta;
 					velocity.z -= velocity.z * 10.0 * delta;
-					//velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+					velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
                     
                     //console.log(moveForward);
                     
@@ -450,17 +499,9 @@
 					controls.getObject().translateY( velocity.y * delta );
 					controls.getObject().translateZ( velocity.z * delta );
                     
-                    console.log(controls.getObject().rotation.y);
-                    console.log(controls.getObject().rotation.x);
-                    console.log(controls.getObject().rotation.z);
-                    
-                    //playerObject.translateX(velocity.x * delta);
-                   // playerObject.translateY(velocity.y * delta);
-                    //playerObject.translateZ(velocity.z * delta);
-                    
 					if ( controls.getObject().position.y < 10 ) {
 						velocity.y = 0;
-						//controls.getObject().position.y = 10;
+						controls.getObject().position.y = 10;
 						canJump = true;
 					}
 					prevTime = time;

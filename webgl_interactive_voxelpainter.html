@@ -34,7 +34,7 @@
                 background:url(http://cdn1.iconfinder.com/data/icons/fatcow/16x16_0020/accept.png) 0 5px no-repeat;
             }
             
-            #gui { position: absolute; top: 0px; left: 100px }
+            #gui { position: absolute; top: 60px; left: 85% }
 
             
 		</style>
@@ -69,13 +69,26 @@
 			var rollOverMesh, rollOverMaterial;
 			var cubeGeo, cubeMaterial;
             var objArray;
-            var currBlockType = 'brick';
+            var currBlockType = 0;
+            var spawnBlock;
+            
+            var t = THREE;
+            var materials = [
+                                 new t.MeshLambertMaterial({/*color: 0x00CCAA,*/map: t.ImageUtils.loadTexture('textures/white-bricks.jpg')}),
+                                 new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/ground.jpg')}),
+                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/wood.jpg')}),
+                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/stone.png')}), 
+                                new t.MeshLambertMaterial({color: 0xFBEBCD})
+                                 ];
 
 			var objects = [];
             
-             var color = {'brick': true, 'wood':false};
+             
 			init();
 			render();
+            
+            
+            
             
            
             
@@ -94,7 +107,7 @@
             
             function openWindow()
             {
-                
+                saveJSON(false);
                 window.open('file2.html');
             }
             
@@ -161,11 +174,18 @@
 				// cubes
 
 				cubeGeo = new THREE.BoxGeometry( 50, 50, 50 );
-				cubeMaterial = new THREE.MeshLambertMaterial( { color: 0xfeb74c, shading: THREE.FlatShading, map: THREE.ImageUtils.loadTexture( "textures/white-bricks.jpg" ) } );
+				cubeMaterial = materials[4];
+                
+                spawnBlock = new t.Mesh(cubeGeo, cubeMaterial);
 
+                spawnBlock.type = 4;
+                
+                scene.add(spawnBlock);
+                objects.push(spawnBlock);
+                
 				// grid
 
-				var size = 500, step = 50;
+				var size = 1000, step = 50;
 
 				var geometry = new THREE.Geometry();
 
@@ -189,7 +209,7 @@
 				raycaster = new THREE.Raycaster();
 				mouse = new THREE.Vector2();
 
-				var geometry = new THREE.PlaneBufferGeometry( 1000, 1000 );
+				var geometry = new THREE.PlaneBufferGeometry( 2000, 2000 );
 				geometry.rotateX( - Math.PI / 2 );
 
 				plane = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { visible: false } ) );
@@ -242,6 +262,9 @@
                 var exportButton = createButton("export", "Export Map", 50, 50, -window.innerHeight/2 + 25, window.innerWidth/2 - 125);
                 exportButton.addEventListener('click', onExportClick);
                 
+                var clearButton = createButton("clear", "Clear Map", 50, 50, -window.innerHeight/2 + 25, window.innerWidth/2 - 250);
+                clearButton.addEventListener('click', clearScreen);
+                
                 document.addEventListener( )
                 
 
@@ -268,7 +291,7 @@
             {
                 //var jsonArray = JSON.parse(JSON.stringify(objArray));
                 
-                saveJSON();
+                saveJSON(true);
                 
                 //console.log(jsonArray.toString);
                 
@@ -311,6 +334,8 @@
 				raycaster.setFromCamera( mouse, camera );
 
 				var intersects = raycaster.intersectObjects( objects );
+                
+                console.log(intersects.length);
 
 				if ( intersects.length > 0 ) {
 
@@ -364,7 +389,7 @@
 
 					if ( isShiftDown ) {
 
-						if ( intersect.object != plane ) {
+						if ( intersect.object != plane && intersect.object != spawnBlock ) {
 
 							scene.remove( intersect.object );
 
@@ -377,20 +402,43 @@
 					} else {
                         if (mouseTemp.length() <= 3)
                         {
-                            var voxel = new THREE.Mesh( cubeGeo, cubeMaterial );
-                            //console.log(intersect.face.normal);
-                            //console.log(intersect.point);
-                            //console.log(intersect.point.add(intersect.face.normal));
-                            voxel.position.copy( intersect.point ).add( intersect.face.normal );
-                            //console.log(voxel.position);
+                            if (currBlockType == 4)
+                            {
+                                scene.remove(spawnBlock)
+                                objects.splice(objects.indexOf(spawnBlock), 1);
+                                
+                                spawnBlock = new THREE.Mesh( cubeGeo, materials[currBlockType] );
+                                spawnBlock.type = 4;
+                                
+                                spawnBlock.position.copy( intersect.point ).add( intersect.face.normal );
+                                //console.log(voxel.position);
 
-                            voxel.position.divideScalar( 50 ).floor().multiplyScalar( 50 ).addScalar( 25 );
-                            //console.log(voxel.position);
-                            scene.add( voxel );
+                                spawnBlock.position.divideScalar( 50 ).floor().multiplyScalar( 50 ).addScalar( 25 );
+                            
+                                //console.log(voxel.position);
+                                scene.add( spawnBlock );
+                                objects.push(spawnBlock);
+                                rollOverMesh.visible = false;
+                            }
+                            else{
+                                
+                                var voxel = new THREE.Mesh( cubeGeo, materials[currBlockType] );
+                                voxel.type = currBlockType;
+                                //console.log(intersect.face.normal);
+                                //console.log(intersect.point);
+                                //console.log(intersect.point.add(intersect.face.normal));
+                                voxel.position.copy( intersect.point ).add( intersect.face.normal );
+                                //console.log(voxel.position);
 
-                            objects.push( voxel );
-                            objArray.push(voxel);
-                            rollOverMesh.visible = false;
+                                voxel.position.divideScalar( 50 ).floor().multiplyScalar( 50 ).addScalar( 25 );
+
+                                //console.log(voxel.position);
+                                scene.add( voxel );
+
+                                objects.push( voxel );
+                                objArray.push(voxel);
+                                rollOverMesh.visible = false;
+                            }
                         }
 
 					}
@@ -437,10 +485,11 @@
 					reader.readAsDataURL(file);
 				}
 			}
+            var voxels;
             
-            function saveJSON() {
+            function saveJSON(openWindow) {
 				var children	= scene.children;
-				var voxels	= [];
+				 voxels	= [];
 				for( var i = 0; i < children.length; i++ ) {
 					var child	= children[i];
 					if( child instanceof THREE.Mesh === false )			continue;
@@ -450,13 +499,17 @@
 						x	: (child.position.x - 25) / 50,
 						y	: (child.position.y - 25) / 50,
 						z	: (child.position.z - 25) / 50,
-						//t	: child.materials[0]._cubeType
+						t	: child.type
 					});
 				}
 				
 				// open a window with the json
-				var dataUri	= "data:application/json;charset=utf-8,"+JSON.stringify(voxels);
-				window.open( dataUri, 'mywindow' );
+                
+                if (openWindow)
+                {
+                    var dataUri	= "data:application/json;charset=utf-8,"+JSON.stringify(voxels);
+                    window.open( dataUri, 'mywindow' );
+                }
 			}
             
             function loadJSON(mapJSON) {
@@ -466,22 +519,44 @@
 					if( children[i] instanceof THREE.Mesh === false ) continue;
 					if( children[i].geometry instanceof THREE.CubeGeometry === false ) continue;
 					if( children[i] === rollOverMesh ) continue;
+                    
+                    objects.splice(objects.indexOf(children[i]), 1);
 					scene.remove( children[i] );
+                    
 				}				
 				// push new cubes
-				var voxels	= JSON.parse(mapJSON);
+                voxels = [];
+                voxels	= JSON.parse(mapJSON);
 				for( var i = 0; i < voxels.length; i++ ){
 					var voxel = voxels[i];
-					var mesh = new THREE.Mesh( cubeGeo, cubeMaterial );
+					var mesh = new THREE.Mesh( cubeGeo, materials[voxel.t] );
 					mesh.position.x = voxel.x * 50 + 25;
 					mesh.position.y = voxel.y * 50 + 25;
 					mesh.position.z = voxel.z * 50 + 25;
+                    mesh.type = voxel.t;
 					mesh.matrixAutoUpdate = true;
 					mesh.updateMatrix();
 					scene.add( mesh );
+                    objects.push(mesh);
 					
 				}
 			}
+            
+            function clearScreen()
+            {
+                // delete all cubes
+				var children	= scene.children.slice(0);
+				for( var i = 0; i < children.length; i++ ) {
+					if( children[i] instanceof THREE.Mesh === false ) continue;
+					if( children[i].geometry instanceof THREE.CubeGeometry === false ) continue;
+					if( children[i] === rollOverMesh ) continue;
+                    if( children[i] === spawnBlock) continue;
+                    
+                    objects.splice(objects.indexOf(children[i]), 1);
+					scene.remove( children[i] );
+                    
+				}		
+            }
 
 			function render() {
                 

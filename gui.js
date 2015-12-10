@@ -1,4 +1,5 @@
 var h;
+var color = {'brick': true, 'ground':false, 'wood':false, 'stone':false, 'spawn': false};
 function setUpGui()
 {
     // gui
@@ -6,8 +7,13 @@ function setUpGui()
     var gui = new dat.GUI();
     h = gui.addFolder("Blocks");
 
-    h.add(color, 'brick').listen().onChange(function(value) {falsifyColors('brick')});
-    h.add(color, 'wood').listen().onChange(function(value) {falsifyColors('wood')});
+    h.add(color, 'brick').listen().onChange(function(value) {falsifyColors('brick'); currBlockType = 0;});
+    h.add(color, 'ground').listen().onChange(function(value) {falsifyColors('ground'); currBlockType = 1;});
+    h.add(color, 'wood').listen().onChange(function(value) {falsifyColors('wood'); currBlockType = 2;});
+    h.add(color, 'stone').listen().onChange(function(value) {falsifyColors('stone'); currBlockType = 3;});
+    
+    gui.add(color, 'spawn').listen().onChange(function(value) {falsifyColors('spawn'); currBlockType = 4;});
+    
     //addColorPropertyToGui();
 
     //color.red = false;
