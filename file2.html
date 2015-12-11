@@ -7,10 +7,12 @@
 		<style>
 			body {
 				font-family: Monospace;
-				background-color: #f0f0f0;
+                
+				
 				margin: 0px;
 				overflow: hidden;
 			}
+            
 
 			#oldie { background-color: #ddd !important }
             
@@ -72,6 +74,7 @@
 			var camera, renderer;
 			var plane, cube;
 			var raycaster, isShiftDown = false;
+            var raycasterposX, raycasternegX, raycasterposZ, raycasternegZ;
 
 			var rollOverMesh, rollOverMaterial;
 			var cubeGeo, cubeMaterial;
@@ -175,12 +178,13 @@
             
             
             
+            // Editor Variables////
             
             
-
-            var voxelArray = window.opener.voxels;
-            var spawnPoint = window.opener.spawnBlock.position;
+            var editor= {voxelArray: window.opener.voxels,
+                          spawnPoint: window.opener.spawnBlock.position};
             
+            var block = window.opener.block;
             
             Physijs.scripts.worker = 'libs/physijs_worker.js';
             Physijs.scripts.ammo = 'ammo.js';
@@ -203,10 +207,15 @@
                 
 				
                 scene = new p.Scene();
+                scene.setGravity(new THREE.Vector3( 0, -30, 0 ));
+                scene.addEventListener('update', function() 
+                {
+                    scene.simulate();
+                });
                 
 				// Set up camera
                 cam = new t.PerspectiveCamera(60, ASPECT, 1, 10000); // FOV, aspect, near, far
-                cam.position.y = UNITSIZE * .2;
+                cam.position.y = 25;
                 
                 
                 scene.add(cam);
@@ -219,9 +228,37 @@
                 
         
                 controls = new THREE.PointerLockControls( cam );
-                controls.getObject().position.x = spawnPoint.x;
-                controls.getObject().position.z = spawnPoint.z;
+                controls.getObject().position.x = editor.spawnPoint.x;
+                controls.getObject().position.z = editor.spawnPoint.z;
 				scene.add( controls.getObject() );
+                
+                controls.moveForward = false;
+                controls.moveBackward = false;
+                controls.moveLeft = false;
+                controls.moveRight = false;
+                
+                controls.move = function(moveDir) {
+                    this.moveForward = false;
+                    this.moveBackward = false;
+                    this.moveLeft = false;
+                    this.moveRight = false;
+                    
+                    switch (moveDir)
+                    {
+                        case 'forward':
+                            this.moveBackward = true;
+                            break;
+                        case 'backward':
+                            this.moveBackward = true;
+                            break;
+                        case 'left':
+                            this.moveLeft = true;
+                            break;
+                        case 'right':
+                            this.moveRight = true;
+                            break;
+                    }
+                }
                 
                 var axis = new THREE.AxisHelper();
                 scene.add(axis);
@@ -235,18 +272,26 @@
                 
                 // tie physijs object to camera
                 
-                scene.simulate();
+                
                 playerObject = new p.BoxMesh(cubeGeo,
                                         new p.createMaterial(new t.MeshBasicMaterial({color:'green'}), .4, .8) );
                 
-                playerObject.position.y += 100;
+                //playerObject.position.y += 100;
                 
-                scene.add(playerObject);
+                //scene.add(playerObject);
                 
                 //controls.getObject().add(playerObject);
                 
                 // Set up raycaster for jumping
                 raycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, - 1, 0 ), 0, 10 );
+                
+                // raycasters for collision detection
+                raycasterposX =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 1,  0, 0 ), 0, 10 );
+                raycasternegX =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( -1, 0, 0 ), 0, 10 );
+                raycasterposZ =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, 0, 1 ), 0, 10 );
+                raycasternegZ =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, 0, -1 ), 0, 10 );
+                
+                
                 setupScene();
 
 				// Lights
@@ -261,6 +306,8 @@
 				renderer = new THREE.WebGLRenderer( { antialias: true } );
 				
 				renderer.setSize( window.innerWidth, window.innerHeight );
+                //renderer.domElement.style.backgroundColor = '#D6F1FF';
+                renderer.setClearColor( 0xD6F1FF );
 				container.appendChild( renderer.domElement );
             
                 
@@ -287,7 +334,7 @@
 				//
 
 				//window.addEventListener( 'resize', onWindowResize, false );
-                
+                scene.simulate();
                 render();
 
 			}
@@ -299,13 +346,41 @@
                 var UNITSIZE = 250,  units = mapW;
                 
                 
+                
+                
+                // skybox
+                var urlPrefix = "textures/";
+                var urls = [ urlPrefix + "calm_right.jpg", urlPrefix + "calm_left.jpg",
+                    urlPrefix + "calm_top.jpg", urlPrefix + "calm_top.jpg",
+                    urlPrefix + "calm_front.jpg", urlPrefix + "calm_back.jpg"];
+                var textureCube = THREE.ImageUtils.loadTextureCube( urls );
+
+                var shader = THREE.ShaderLib["cube"];
+                var uniforms = THREE.UniformsUtils.clone( shader.uniforms );
+                uniforms['tCube'].value = textureCube;   // textureCube has been init before
+                
+                var material = new THREE.ShaderMaterial({
+                    fragmentShader    : shader.fragmentShader,
+                    vertexShader  : shader.vertexShader,
+                    uniforms  : uniforms,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                
+                // build the skybox Mesh 
+                skyboxMesh    = new THREE.Mesh( new THREE.BoxGeometry( 10000, 10000, 10000, 1, 1, 1), material );
+                // add it to the scene
+                scene.add( skyboxMesh );
+                
+
 
                 // Geometry: floor
                 var floor = new p.BoxMesh(
-                        new t.CubeGeometry(2000, 10, 2000),
+                        new t.CubeGeometry(2000, 0, 2000),
                         new p.createMaterial( new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}), .4, .8 ), 0
                 );
                 scene.add(floor);
+                objects.push(floor);
                 
                 
         
@@ -313,12 +388,12 @@
                 var cube = new t.CubeGeometry(50, 50, 50);
                 
                 
-                for( var i = 0; i < voxelArray.length; i++ ){
-					var voxel = voxelArray[i];
+                for( var i = 0; i < editor.voxelArray.length; i++ ){
+					var voxel = editor.voxelArray[i];
 					
-                    if (voxel.t != 4)
+                    if (voxel.t != block.SPAWN)
                     {
-                        var mesh = new p.BoxMesh( cube, new p.createMaterial(materials[voxel.t], .4, .8), 0 ) ;
+                        var mesh = new p.BoxMesh( cube, new p.createMaterial(materials[voxel.t], .4, .8) ) ;
 
                         mesh.position.x = voxel.x * 50 + 25;
                         mesh.position.y = voxel.y * 50 + 25;
@@ -327,6 +402,7 @@
                         mesh.updateMatrix();
                         meshArray.push(mesh);
                         scene.add( mesh );
+                        objects.push(mesh);
                     }
                     
 					
@@ -355,7 +431,7 @@
                 
                 event.preventDefault();
                 
-                console.log("hello world");
+               
 
 				
             }
@@ -365,17 +441,21 @@
 				switch ( event.keyCode ) {
 						case 38: // up
 						case 87: // w
+                            controls.move('forward');
 							moveForward = true;
 							break;
 						case 37: // left
 						case 65: // a
+                            controls.move('left');
 							moveLeft = true; break;
 						case 40: // down
 						case 83: // s
+                            controls.move('backward');
 							moveBackward = true;
 							break;
 						case 39: // right
 						case 68: // d
+                            controls.move('right');
 							moveRight = true;
 							break;
 						case 32: // space
@@ -431,9 +511,14 @@
 					var delta = ( time - prevTime ) / 1000;
 					velocity.x -= velocity.x * 10.0 * delta;
 					velocity.z -= velocity.z * 10.0 * delta;
-					//velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+					velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+                    
+                    //console.log(isOnObject);
                     
                     //console.log(moveForward);
+                    
+                    //console.log(controls.getDirection(new THREE.Vector3(0,0,0) ) );
+                    
                     
 					if ( moveForward ) velocity.z -= 1000.0 * delta;
 					if ( moveBackward ) velocity.z += 1000.0 * delta;
@@ -441,26 +526,35 @@
 					if ( moveRight ) velocity.x += 1000.0 * delta;
 					if ( isOnObject === true ) {
 						velocity.y = Math.max( 0, velocity.y );
+                        //controls.getObject().position.y = intersections[0].position.y;
 						canJump = true;
 					}
                     
                     //console.log(velocity);
                     
+                    //console.log(controls.moveForward());
+                    
 					controls.getObject().translateX( velocity.x * delta );
 					controls.getObject().translateY( velocity.y * delta );
 					controls.getObject().translateZ( velocity.z * delta );
                     
+                    /*
                     console.log(controls.getObject().rotation.y);
                     console.log(controls.getObject().rotation.x);
                     console.log(controls.getObject().rotation.z);
-                    
+                    console.log("Player: " + playerObject.rotation.y);
+                    console.log(playerObject.rotation.x);
+                    console.log(playerObject.rotation.z);
+                    */
                     //playerObject.translateX(velocity.x * delta);
                    // playerObject.translateY(velocity.y * delta);
                     //playerObject.translateZ(velocity.z * delta);
                     
+                    console.log(controls.moveLeft);
+                    
 					if ( controls.getObject().position.y < 10 ) {
 						velocity.y = 0;
-						//controls.getObject().position.y = 10;
+						controls.getObject().position.y = 10;
 						canJump = true;
 					}
 					prevTime = time;
@@ -487,6 +581,45 @@
 
 			}
             
+            
+            /*
+            function detectCollision() {
+               // unlockAllDirection();
+
+                var rotationMatrix;
+                var cameraDirection = controls.getDirection(new THREE.Vector3(0, 0, 0)).clone();
+
+                if (controls.moveForward()) {
+                    // Nothing to do!
+                }
+                else if (controls.moveBackward()) {
+                    rotationMatrix = new THREE.Matrix4();
+                    rotationMatrix.makeRotationY(180 * Math.PI / 180);
+                }
+                else if (controls.moveLeft()) {
+                    rotationMatrix = new THREE.Matrix4();
+                    rotationMatrix.makeRotationY(90 * Math.PI / 180);
+                }
+                else if (controls.moveRight()) {
+                    rotationMatrix = new THREE.Matrix4();
+                    rotationMatrix.makeRotationY((360-90) * Math.PI / 180);
+                }
+                else return;
+
+                if (rotationMatrix !== undefined){
+                    cameraDirection.applyMatrix4(rotationMatrix);
+                }
+                var rayCaster = new THREE.Raycaster(controls.getObject().position, cameraDirection);    
+                var intersects = rayCaster.intersectObject(hitMesh, true);  
+
+                $("#status").html("camera direction x: " + cameraDirection.x + " , z: " + cameraDirection.z);
+
+                if ((intersects.length > 0 && intersects[0].distance < 25)) {
+                    //lockDirection();
+                    
+                }
+            }
+            */
             
             
             

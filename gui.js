@@ -7,12 +7,12 @@ function setUpGui()
     var gui = new dat.GUI();
     h = gui.addFolder("Blocks");
 
-    h.add(color, 'brick').listen().onChange(function(value) {falsifyColors('brick'); currBlockType = 0;});
-    h.add(color, 'ground').listen().onChange(function(value) {falsifyColors('ground'); currBlockType = 1;});
-    h.add(color, 'wood').listen().onChange(function(value) {falsifyColors('wood'); currBlockType = 2;});
-    h.add(color, 'stone').listen().onChange(function(value) {falsifyColors('stone'); currBlockType = 3;});
+    h.add(color, 'brick').listen().onChange(function(value) {falsifyColors('brick'); currBlockType = block.BRICK;});
+    h.add(color, 'ground').listen().onChange(function(value) {falsifyColors('ground'); currBlockType = block.GROUND;});
+    h.add(color, 'wood').listen().onChange(function(value) {falsifyColors('wood'); currBlockType = block.WOOD;});
+    h.add(color, 'stone').listen().onChange(function(value) {falsifyColors('stone'); currBlockType = block.STONE;});
     
-    gui.add(color, 'spawn').listen().onChange(function(value) {falsifyColors('spawn'); currBlockType = 4;});
+    gui.add(color, 'spawn').listen().onChange(function(value) {falsifyColors('spawn'); currBlockType = block.SPAWN;});
     
     //addColorPropertyToGui();
 

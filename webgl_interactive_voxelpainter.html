@@ -83,6 +83,15 @@
 
 			var objects = [];
             
+            var block = {
+                BRICK : 0,
+                GROUND : 1,
+                WOOD : 2,
+                STONE : 3,
+                SPAWN : 4
+                
+            };
+            
              
 			init();
 			render();
@@ -174,11 +183,11 @@
 				// cubes
 
 				cubeGeo = new THREE.BoxGeometry( 50, 50, 50 );
-				cubeMaterial = materials[4];
+				cubeMaterial = materials[block.SPAWN];
                 
                 spawnBlock = new t.Mesh(cubeGeo, cubeMaterial);
 
-                spawnBlock.type = 4;
+                spawnBlock.type = block.SPAWN;
                 
                 scene.add(spawnBlock);
                 objects.push(spawnBlock);
@@ -402,7 +411,7 @@
 					} else {
                         if (mouseTemp.length() <= 3)
                         {
-                            if (currBlockType == 4)
+                            if (currBlockType == block.SPAWN)
                             {
                                 scene.remove(spawnBlock)
                                 objects.splice(objects.indexOf(spawnBlock), 1);
