@@ -85,19 +85,19 @@
             var WIDTH = window.innerWidth,
             HEIGHT = window.innerHeight,
             ASPECT = WIDTH / HEIGHT,
-            UNITSIZE = 250,
-            WALLHEIGHT = UNITSIZE / 3,
-            MOVESPEED = 100,
-            LOOKSPEED = 0.075,
-            BULLETMOVESPEED = MOVESPEED * 5,
-            NUMAI = 5,
-            PROJECTILEDAMAGE = 20;
+            UNITSIZE = 250;
+            //WALLHEIGHT = UNITSIZE / 3,
+            //MOVESPEED = 100,
+            //LOOKSPEED = 0.075,
+            //BULLETMOVESPEED = MOVESPEED * 5,
+            //NUMAI = 5,
+            //PROJECTILEDAMAGE = 20;
             
             // Global vars
-            var t = THREE, scene, cam, renderer, controls, projector, model, skin;
+            var t = THREE, scene, cam, renderer, controls, projector;
             var p = Physijs;
-            var runAnim = true, mouse = { x: 0, y: 0 }, kills = 0, health = 100;
-            var healthCube, lastHealthPickup = 0;
+            var mouse = { x: 0, y: 0 };
+            
             var mapW = 1000, mapH = 1000;
             var timeStep;
             
@@ -110,6 +110,7 @@
 			var moveLeft = false;
 			var moveRight = false;
 			var canJump = false;
+            var canMove = false;
             
             var controlsEnabled = false;
             
@@ -133,8 +134,8 @@
 						controls.enabled = true;
 					} else {
 						controls.enabled = false;
-						console.log("This doesn't work");
-                        instructions.style.display = 'initial';
+						//console.log("This doesn't work");
+                        instructions.style.display = '-webkit-box';
 					}
 				};
                 
@@ -181,8 +182,20 @@
             // Editor Variables////
             
             
-            var editor= {voxelArray: window.opener.voxels,
-                          spawnPoint: window.opener.spawnBlock.position};
+            var editor= { voxelArray: window.opener.voxels,
+                          spawnPoint: window.opener.spawnBlock.position,
+                          hasPhysics: window.opener.menu.EnablePhysics,
+                          gravity: window.opener.menu.gravity,
+                          impulse: window.opener.menu.impulse,
+                          blockMass: window.opener.menu.blockMass,
+                          isStatic: window.opener.menu.static,
+                          planeSize: window.opener.initSize,
+                          Mountains : window.opener.skymap.Mountains,
+                          bluefreeze : window.opener.skymap.bluefreeze,
+                         darkland : window.opener.skymap.darkland,
+                         city : window.opener.skymap.city,
+                         comawhite : window.opener.skymap.comawhite
+                        };
             
             var block = window.opener.block;
             
@@ -206,12 +219,17 @@
                 projector = new t.Projector(); // Used in bullet projection
                 
 				
-                scene = new p.Scene();
-                scene.setGravity(new THREE.Vector3( 0, -30, 0 ));
-                scene.addEventListener('update', function() 
+                if (editor.hasPhysics)
                 {
-                    scene.simulate();
-                });
+                    scene = new p.Scene();
+                    scene.setGravity(new THREE.Vector3( 0, editor.gravity, 0 ));
+                    scene.addEventListener('update', function() 
+                    {
+                        scene.simulate();
+                    });
+                }
+                else
+                    scene = new t.Scene();
                 
 				// Set up camera
                 cam = new t.PerspectiveCamera(60, ASPECT, 1, 10000); // FOV, aspect, near, far
@@ -230,6 +248,7 @@
                 controls = new THREE.PointerLockControls( cam );
                 controls.getObject().position.x = editor.spawnPoint.x;
                 controls.getObject().position.z = editor.spawnPoint.z;
+                controls.getObject().position.y = editor.spawnPoint.y;
 				scene.add( controls.getObject() );
                 
                 controls.moveForward = false;
@@ -237,6 +256,7 @@
                 controls.moveLeft = false;
                 controls.moveRight = false;
                 
+                // function that determines the latest direction of the player for the raycaster
                 controls.move = function(moveDir) {
                     this.moveForward = false;
                     this.moveBackward = false;
@@ -246,7 +266,7 @@
                     switch (moveDir)
                     {
                         case 'forward':
-                            this.moveBackward = true;
+                            this.moveForward = true;
                             break;
                         case 'backward':
                             this.moveBackward = true;
@@ -260,8 +280,9 @@
                     }
                 }
                 
-                var axis = new THREE.AxisHelper();
-                scene.add(axis);
+                
+                //var axis = new THREE.AxisHelper();
+                //scene.add(axis);
             
                 
 
@@ -270,27 +291,11 @@
 				cubeGeo = new THREE.BoxGeometry( 50, 50, 50 );
 				cubeMaterial = new THREE.MeshLambertMaterial( { color: 0xfeb74c, shading: THREE.FlatShading, map: THREE.ImageUtils.loadTexture( "textures/white-bricks.jpg" ) } );
                 
-                // tie physijs object to camera
-                
-                
-                playerObject = new p.BoxMesh(cubeGeo,
-                                        new p.createMaterial(new t.MeshBasicMaterial({color:'green'}), .4, .8) );
-                
-                //playerObject.position.y += 100;
-                
-                //scene.add(playerObject);
-                
-                //controls.getObject().add(playerObject);
                 
                 // Set up raycaster for jumping
                 raycaster = new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, - 1, 0 ), 0, 10 );
                 
-                // raycasters for collision detection
-                raycasterposX =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 1,  0, 0 ), 0, 10 );
-                raycasternegX =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( -1, 0, 0 ), 0, 10 );
-                raycasterposZ =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, 0, 1 ), 0, 10 );
-                raycasternegZ =  new THREE.Raycaster( new THREE.Vector3(), new THREE.Vector3( 0, 0, -1 ), 0, 10 );
-                
+               
                 
                 setupScene();
 
@@ -309,12 +314,6 @@
                 //renderer.domElement.style.backgroundColor = '#D6F1FF';
                 renderer.setClearColor( 0xD6F1FF );
 				container.appendChild( renderer.domElement );
-            
-                
-                //stats = new Stats();
-				//stats.domElement.style.position = 'absolute';
-				//stats.domElement.style.top = '0px';
-				//container.appendChild( stats.domElement );
 
 
 				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
@@ -322,19 +321,18 @@
 				document.addEventListener( 'keydown', onDocumentKeyDown, false );
 				document.addEventListener( 'keyup', onDocumentKeyUp, false );
                 document.addEventListener( 'mouseup', onDocumentMouseUp, false );
-                //document.addEventListener( 'mousewheel', onDocumentWheel, false);
-                //document.addEventListener( 'drop', onDrop, false);
-                //document.addEventListener( 'dragover', onDragOver, false);
-                
-                
-                
-                
                 
 
 				//
 
 				//window.addEventListener( 'resize', onWindowResize, false );
-                scene.simulate();
+                
+                if (editor.hasPhysics)
+                    scene.simulate();
+                
+                raycaster.ray.origin.copy( controls.getObject().position );
+					raycaster.ray.origin.y -= 10;
+                
                 render();
 
 			}
@@ -346,13 +344,25 @@
                 var UNITSIZE = 250,  units = mapW;
                 
                 
-                
+                var skymaptype;
+                if (editor.Mountains)
+                    skymaptype = 'mountains';
+                else if (editor.bluefreeze)
+                    skymaptype = 'bluefreeze';
+                else if (editor.darkland)
+                    skymaptype = 'darkland';
+                else if (editor.city)
+                    skymaptype = 'city';
+                else if (editor.comawhite)
+                    skymaptype = 'comawhite';
+                else
+                    console.log("no value found");
                 
                 // skybox
-                var urlPrefix = "textures/";
-                var urls = [ urlPrefix + "calm_right.jpg", urlPrefix + "calm_left.jpg",
-                    urlPrefix + "calm_top.jpg", urlPrefix + "calm_top.jpg",
-                    urlPrefix + "calm_front.jpg", urlPrefix + "calm_back.jpg"];
+                var urlPrefix = "textures/" + skymaptype + "/";
+                var urls = [ urlPrefix + "right.jpg", urlPrefix + "left.jpg",
+                    urlPrefix + "top.jpg", urlPrefix + "top.jpg",
+                    urlPrefix + "front.jpg", urlPrefix + "back.jpg"];
                 var textureCube = THREE.ImageUtils.loadTextureCube( urls );
 
                 var shader = THREE.ShaderLib["cube"];
@@ -375,16 +385,19 @@
 
 
                 // Geometry: floor
-                var floor = new p.BoxMesh(
-                        new t.CubeGeometry(2000, 0, 2000),
+                var floor = editor.hasPhysics ? new p.BoxMesh(
+                        new t.CubeGeometry(editor.planeSize*2, 0, editor.planeSize*2),
                         new p.createMaterial( new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}), .4, .8 ), 0
-                );
+                ) : new t.Mesh(
+                        new t.CubeGeometry(editor.planeSize*2, 0, editor.planeSize*2),
+                        new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}) ) ;
+                
                 scene.add(floor);
                 objects.push(floor);
                 
                 
         
-                // Geometry: walls
+                // Geometry: blocks
                 var cube = new t.CubeGeometry(50, 50, 50);
                 
                 
@@ -393,13 +406,14 @@
 					
                     if (voxel.t != block.SPAWN)
                     {
-                        var mesh = new p.BoxMesh( cube, new p.createMaterial(materials[voxel.t], .4, .8) ) ;
+                        var mesh =  editor.hasPhysics ? voxel.static ? new p.BoxMesh( cube, new p.createMaterial(materials[voxel.t], .4, .8), 0 )
+                        : new p.BoxMesh( cube, new p.createMaterial(materials[voxel.t], .4, .8), editor.blockMass ) : new t.Mesh(cube, materials[voxel.t]) ;
 
                         mesh.position.x = voxel.x * 50 + 25;
                         mesh.position.y = voxel.y * 50 + 25;
                         mesh.position.z = voxel.z * 50 + 25;
-                        mesh.matrixAutoUpdate = true;
-                        mesh.updateMatrix();
+                        //mesh.matrixAutoUpdate = true;
+                        //mesh.updateMatrix();
                         meshArray.push(mesh);
                         scene.add( mesh );
                         objects.push(mesh);
@@ -412,7 +426,44 @@
             } // end function
             
             
+            var bullets = [];
+            var sphereMaterial = new t.MeshBasicMaterial({color: 0x333333});
+            var sphereGeo = new t.SphereGeometry(5);
+            var sphere;
+            var mVec;
+            
+            function createBullet(obj) {
+                if (obj === undefined) {
+                    obj = controls.getObject();
+                }
+                 sphere = new p.SphereMesh(sphereGeo, new p.createMaterial(sphereMaterial, .4, .4) );
+                
+                var vector = controls.getDirection(new t.Vector3(0,0,0)).clone();
+                //mVec = vector.clone();
+                vector.normalize();
+                
+                // gets euler angles
+                //var angle = Math.acos( vector.dot(new THREE.Vector3(1, 0, 0)) );
+                var anglex = Math.acos( vector.dot(new THREE.Vector3(1, 0, 0)) );
+                var angley = Math.acos( vector.dot(new THREE.Vector3(0, 1, 0)) );
+                var anglez = Math.acos( vector.dot(new THREE.Vector3(0, 0, 1)) );
+                
+                // calculates proper position of projectile from euler angles
+                sphere.position.set(obj.position.x + 50*Math.cos(anglex), obj.position.y + 20 + 50*Math.cos(angley), obj.position.z + 50*Math.cos(anglez) );
+                
+                
+                sphere.owner = obj;
 
+                bullets.push(sphere);
+                scene.add(sphere);
+                
+                mVec = vector.clone();
+                sphere.applyCentralImpulse(new t.Vector3(mVec.x * editor.impulse, mVec.y * editor.impulse, mVec.z * editor.impulse));
+                //console.log("vector is: " + vector.x);
+                
+
+                return sphere;
+            }
 			
            
             
@@ -421,9 +472,9 @@
 
 				event.preventDefault();
                 
+                if (event.which == 1 && controls.enabled && editor.hasPhysics)
+                    createBullet();
                 
-
-				
 
 			}
             
@@ -464,6 +515,8 @@
 							break;
 					}
                 
+                
+                
                 //render();
 
 			}
@@ -497,10 +550,6 @@
 
 			function render() {
                 
-                //var delta = clock.getDelta(), speed = delta * BULLETMOVESPEED;
-                //var aispeed = delta * MOVESPEED;
-                //controls.update(delta); // Move camera
-                
                 if ( controlsEnabled ) {
                    
 					raycaster.ray.origin.copy( controls.getObject().position );
@@ -509,54 +558,66 @@
 					var isOnObject = intersections.length > 0;
 					var time = performance.now();
 					var delta = ( time - prevTime ) / 1000;
-					velocity.x -= velocity.x * 10.0 * delta;
+					
+                    
+                    velocity.x -= velocity.x * 10.0 * delta;
 					velocity.z -= velocity.z * 10.0 * delta;
-					velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
+
                     
-                    //console.log(isOnObject);
-                    
-                    //console.log(moveForward);
-                    
-                    //console.log(controls.getDirection(new THREE.Vector3(0,0,0) ) );
+					   velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
                     
                     
-					if ( moveForward ) velocity.z -= 1000.0 * delta;
-					if ( moveBackward ) velocity.z += 1000.0 * delta;
-					if ( moveLeft ) velocity.x -= 1000.0 * delta;
-					if ( moveRight ) velocity.x += 1000.0 * delta;
-					if ( isOnObject === true ) {
+                    
+                    if ( moveForward ) velocity.z -= 1000.0 * delta;
+                    if ( moveBackward ) velocity.z += 1000.0 * delta;
+                    if ( moveLeft ) velocity.x -= 1000.0 * delta;
+                    if ( moveRight ) velocity.x += 1000.0 * delta;
+                    
+                    
+                    if ( isOnObject === true ) {
 						velocity.y = Math.max( 0, velocity.y );
                         //controls.getObject().position.y = intersections[0].position.y;
 						canJump = true;
 					}
                     
-                    //console.log(velocity);
                     
-                    //console.log(controls.moveForward());
                     
+                    detectCollision();
+                    
+                    if (canMove){
 					controls.getObject().translateX( velocity.x * delta );
-					controls.getObject().translateY( velocity.y * delta );
+					
 					controls.getObject().translateZ( velocity.z * delta );
+                    }
+                    
+                    
+                    controls.getObject().translateY( velocity.y * delta );
                     
                     /*
                     console.log(controls.getObject().rotation.y);
                     console.log(controls.getObject().rotation.x);
                     console.log(controls.getObject().rotation.z);
                     console.log("Player: " + playerObject.rotation.y);
-                    console.log(playerObject.rotation.x);
+                    console.log(player-Object.rotation.x);
                     console.log(playerObject.rotation.z);
                     */
                     //playerObject.translateX(velocity.x * delta);
                    // playerObject.translateY(velocity.y * delta);
                     //playerObject.translateZ(velocity.z * delta);
                     
-                    console.log(controls.moveLeft);
+                    //console.log(controls.moveLeft);
                     
 					if ( controls.getObject().position.y < 10 ) {
 						velocity.y = 0;
 						controls.getObject().position.y = 10;
 						canJump = true;
 					}
+                    
+                    if (isOnObject)
+                    {
+                        console.log("YEP");
+                       //controls.getObject().position.y = intersections[0].position.y + 25; 
+                    }
 					prevTime = time;
 				}
                 
@@ -565,14 +626,6 @@
 		          
                 
                 //console.log(body.position + "this is the first body position");
-                for (var i = 0; i < bodyArray.length; i++)
-                {
-                    //console.log(bodyArray[0]);
-                    bodyArray[i].mesh.position.copy(bodyArray[i].position);
-                    bodyArray[i].mesh.quaternion.copy( bodyArray[i].quaternion );
-                    
-                    
-                }
                 
                 
 
@@ -582,25 +635,28 @@
 			}
             
             
-            /*
+            
             function detectCollision() {
                // unlockAllDirection();
-
+                //canMove = false;
                 var rotationMatrix;
                 var cameraDirection = controls.getDirection(new THREE.Vector3(0, 0, 0)).clone();
+                
+                // if the player is looking straight up, the x and z components are both set to zero?
+                cameraDirection.setY(0);
 
-                if (controls.moveForward()) {
-                    // Nothing to do!
+                if (controls.moveForward) {
+                    //console.log("We do nothing"); // Nothing to do!
                 }
-                else if (controls.moveBackward()) {
+                else if (controls.moveBackward) {
                     rotationMatrix = new THREE.Matrix4();
                     rotationMatrix.makeRotationY(180 * Math.PI / 180);
                 }
-                else if (controls.moveLeft()) {
+                else if (controls.moveLeft) {
                     rotationMatrix = new THREE.Matrix4();
                     rotationMatrix.makeRotationY(90 * Math.PI / 180);
                 }
-                else if (controls.moveRight()) {
+                else if (controls.moveRight) {
                     rotationMatrix = new THREE.Matrix4();
                     rotationMatrix.makeRotationY((360-90) * Math.PI / 180);
                 }
@@ -609,17 +665,21 @@
                 if (rotationMatrix !== undefined){
                     cameraDirection.applyMatrix4(rotationMatrix);
                 }
-                var rayCaster = new THREE.Raycaster(controls.getObject().position, cameraDirection);    
-                var intersects = rayCaster.intersectObject(hitMesh, true);  
+                var myrayCaster = new THREE.Raycaster(controls.getObject().position, cameraDirection);    
+                var intersects = myrayCaster.intersectObjects(objects);  
 
-                $("#status").html("camera direction x: " + cameraDirection.x + " , z: " + cameraDirection.z);
+                
 
-                if ((intersects.length > 0 && intersects[0].distance < 25)) {
+                if ((intersects.length > 0 && intersects[0].distance < 25)) 
+                    canMove = false;
+                else
+                    canMove = true;
+                
                     //lockDirection();
                     
-                }
+                
             }
-            */
+            
             
             
             
@@ -656,6 +716,11 @@
             //Assumes lo and hi are integers and lo is lower than hi.
             function getRandBetween(lo, hi) {
              return parseInt(Math.floor(Math.random()*(hi-lo+1))+lo, 10);
+            }
+            
+            function calcDegrees(radians)
+            {
+                return radians * 180/Math.PI;
             }
 
 		</script>

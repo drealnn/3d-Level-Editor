@@ -52,6 +52,71 @@
         <script src="js/controls/OrbitControls.js"></script>
         <script src='js/libs/dat.gui.min.js'></script>
         <script src='gui.js'></script>
+        
+        <!-- Shaders -->
+        <script type="x-shader/x-vertex" id="vertexshader">
+
+            // switch on high precision floats
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+            
+            attribute float displacement;
+            varying vec3 vNormal;
+
+            void main() {
+
+              vNormal = normal;
+
+              // push the displacement into the
+              // three slots of a 3D vector so
+              // it can be used in operations
+              // with other 3D vectors like
+              // positions and normals
+              vec3 newPosition = position +
+                normal * vec3(displacement);
+
+              gl_Position = projectionMatrix *
+                            modelViewMatrix *
+                            vec4(newPosition, 1.0);
+            }
+
+        </script>
+
+        <script type="x-shader/x-fragment" id="fragmentshader">
+
+            #ifdef GL_ES
+            precision highp float;
+            #endif
+
+            // same name and type as VS
+            varying vec3 vNormal;
+
+            void main() {
+
+              // calc the dot product and clamp
+              // 0 -> 1 rather than -1 -> 1
+              vec3 light = vec3(0.5, 0.2, 1.0);
+
+              // ensure it's normalized
+              light = normalize(light);
+
+              // calculate the dot product of
+              // the light to the vertex normal
+              float dProd = max(0.0,
+                                dot(vNormal, light));
+
+              // feed into our frag colour
+              gl_FragColor = vec4(dProd, // R
+                                  dProd, // G
+                                  dProd, // B
+                                  1.0);  // A
+
+            }
+
+        </script>
+
+        <!-- End Shaders -->
     
 
 		<script>
@@ -71,6 +136,9 @@
             var objArray;
             var currBlockType = 0;
             var spawnBlock;
+            var line;
+            var initSize = 1000;
+            
             
             var t = THREE;
             var materials = [
@@ -154,13 +222,14 @@
 				info.style.top = '10px';
 				info.style.width = '100%';
 				info.style.textAlign = 'center';
-				info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> - voxel painter - webgl<br><strong>click</strong>: add voxel, <strong>shift + click</strong>: remove voxel';
+				info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> - Level Editor <br><strong>click</strong>: add voxel, <strong>shift + click</strong>: remove voxel';
 				container.appendChild( info );
                 
+                /*
                 var link = document.createElement( 'div');
                 link.innerHTML = '<a href="javascript:openWindow();">CLICK ME</a>';
                 container.appendChild(link);
-                
+                */
                 
                 
 				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000 );
@@ -195,6 +264,7 @@
 				// grid
 
 				var size = 1000, step = 50;
+                initSize = size;
 
 				var geometry = new THREE.Geometry();
 
@@ -210,7 +280,7 @@
 
 				var material = new THREE.LineBasicMaterial( { color: 0x000000, opacity: 0.2, transparent: true } );
 
-				var line = new THREE.LineSegments( geometry, material );
+				line = new THREE.LineSegments( geometry, material );
 				scene.add( line );
 
 				//
@@ -273,6 +343,9 @@
                 
                 var clearButton = createButton("clear", "Clear Map", 50, 50, -window.innerHeight/2 + 25, window.innerWidth/2 - 250);
                 clearButton.addEventListener('click', clearScreen);
+                
+                var playButton = createButton("play", "Play Map", 50, 50, -window.innerHeight/2 + 50, 0);
+                playButton.addEventListener('click', openWindow);
                 
                 document.addEventListener( )
                 
@@ -344,7 +417,7 @@
 
 				var intersects = raycaster.intersectObjects( objects );
                 
-                console.log(intersects.length);
+                //console.log(intersects.length);
 
 				if ( intersects.length > 0 ) {
 
@@ -418,6 +491,7 @@
                                 
                                 spawnBlock = new THREE.Mesh( cubeGeo, materials[currBlockType] );
                                 spawnBlock.type = 4;
+                                spawnBlock.static = menu.static;
                                 
                                 spawnBlock.position.copy( intersect.point ).add( intersect.face.normal );
                                 //console.log(voxel.position);
@@ -433,6 +507,7 @@
                                 
                                 var voxel = new THREE.Mesh( cubeGeo, materials[currBlockType] );
                                 voxel.type = currBlockType;
+                                voxel.static = menu.static;
                                 //console.log(intersect.face.normal);
                                 //console.log(intersect.point);
                                 //console.log(intersect.point.add(intersect.face.normal));
@@ -508,10 +583,13 @@
 						x	: (child.position.x - 25) / 50,
 						y	: (child.position.y - 25) / 50,
 						z	: (child.position.z - 25) / 50,
-						t	: child.type
+						t	: child.type,
+                        static : child.static
 					});
 				}
 				
+                
+                
 				// open a window with the json
                 
                 if (openWindow)
@@ -542,8 +620,18 @@
 					mesh.position.x = voxel.x * 50 + 25;
 					mesh.position.y = voxel.y * 50 + 25;
 					mesh.position.z = voxel.z * 50 + 25;
+                    //conole.log('hello');
+                    //console.log("this is the static: " + voxel.static);
                     mesh.type = voxel.t;
+                    mesh.static = voxel.static;
 					mesh.matrixAutoUpdate = true;
+                    
+                    if (voxel.t == block.SPAWN)
+                    {
+                        spawnBlock = mesh;
+                        //scene.remove(spawnBlock);
+                    }
+                    
 					mesh.updateMatrix();
 					scene.add( mesh );
                     objects.push(mesh);
