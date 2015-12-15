@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>three.js webgl - interactive - voxel painter</title>
+		<title>CAP 4720-FPS Perspective-Daniel Sledd</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<style>
@@ -33,6 +33,8 @@
 				box-align: center;
 				color: #000000;
 				text-align: center;
+                color:green;
+                background-color: black;
 				cursor: pointer;
 			}
             
@@ -56,16 +58,14 @@
         <div id="blocker">
 
 			<div id="instructions">
-				<span style="font-size:40px">Click to play</span>
+				<span style="font-size:40px">CLICK BANNER TO START</span>
 				<br />
-				(W, A, S, D = Move, SPACE = Jump, MOUSE = Look around)
+				(W, A, S, D = Move, SPACE = Jump, MOUSE = Look around, LEFTCLICK = Shoot cannon)
 			</div>
 
 		</div>
         
 		<script>
-
-			//if ( ! Detector.webgl ) Detector.addGetWebGLMessage();
             
             var clock = new THREE.Clock();
 			var container;
@@ -86,12 +86,7 @@
             HEIGHT = window.innerHeight,
             ASPECT = WIDTH / HEIGHT,
             UNITSIZE = 250;
-            //WALLHEIGHT = UNITSIZE / 3,
-            //MOVESPEED = 100,
-            //LOOKSPEED = 0.075,
-            //BULLETMOVESPEED = MOVESPEED * 5,
-            //NUMAI = 5,
-            //PROJECTILEDAMAGE = 20;
+            
             
             // Global vars
             var t = THREE, scene, cam, renderer, controls, projector;
@@ -118,12 +113,18 @@
 			var velocity = new THREE.Vector3();
             
             var materials = [
-                                 new t.MeshLambertMaterial({/*color: 0x00CCAA,*/map: t.ImageUtils.loadTexture('textures/white-bricks.jpg')}),
-                                 new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/ground.jpg')}),
-                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/wood.jpg')}),
-                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/stone.png')}),
+                                 new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('textures/white-bricks.jpg')}),
+                                 new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}),
+                                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/wood.jpg')}),
+                                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/stone.png')}),
                                  new t.MeshLambertMaterial({color: 0xFBEBCD}),
                                  ];
+            
+            var planeMaterials = [
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')} ),
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('textures/snow.jpg')} ) ,
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('textures/concrete.jpg')} ) 
+            ];
             
             var havePointerLock = 'pointerLockElement' in document || 'mozPointerLockElement' in document || 'webkitPointerLockElement' in document;
 			if ( havePointerLock ) {
@@ -194,7 +195,9 @@
                           bluefreeze : window.opener.skymap.bluefreeze,
                          darkland : window.opener.skymap.darkland,
                          city : window.opener.skymap.city,
-                         comawhite : window.opener.skymap.comawhite
+                         comawhite : window.opener.skymap.comawhite,
+                         
+                         currentPlaneMaterial: window.opener.currentPlaneMaterial
                         };
             
             var block = window.opener.block;
@@ -280,16 +283,20 @@
                     }
                 }
                 
-                
-                //var axis = new THREE.AxisHelper();
-                //scene.add(axis);
-            
-                
-
+      
 				// cubes
 
 				cubeGeo = new THREE.BoxGeometry( 50, 50, 50 );
 				cubeMaterial = new THREE.MeshLambertMaterial( { color: 0xfeb74c, shading: THREE.FlatShading, map: THREE.ImageUtils.loadTexture( "textures/white-bricks.jpg" ) } );
+                
+                playerObject = new p.BoxMesh(cubeGeo, new p.createMaterial(cubeMaterial, .4, .8), 0);
+                playerObject.position.copy(controls.getObject().position);
+                //playerObject.add(controls.getObject());
+                playerObject.position.y += 30;
+                
+                
+                
+                scene.add(playerObject);
                 
                 
                 // Set up raycaster for jumping
@@ -387,10 +394,10 @@
                 // Geometry: floor
                 var floor = editor.hasPhysics ? new p.BoxMesh(
                         new t.CubeGeometry(editor.planeSize*2, 0, editor.planeSize*2),
-                        new p.createMaterial( new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}), .4, .8 ), 0
+                        new p.createMaterial( planeMaterials[editor.currentPlaneMaterial], .4, .8 ), 0
                 ) : new t.Mesh(
                         new t.CubeGeometry(editor.planeSize*2, 0, editor.planeSize*2),
-                        new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}) ) ;
+                        planeMaterials[editor.currentPlaneMaterial] ) ;
                 
                 scene.add(floor);
                 objects.push(floor);
@@ -517,7 +524,7 @@
                 
                 
                 
-                //render();
+                
 
 			}
 
@@ -541,7 +548,7 @@
 							break;
 					}
 
-               // render();
+               
 
 			}
             
@@ -566,6 +573,13 @@
                     
 					   velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
                     
+                    playerObject.__dirtyPosition = true;
+                    playerObject.__dirtyRotation = true;
+                    
+                    playerObject.rotation.y = controls.getObject().rotation.y;
+                    
+                    //playerObject.setAngularVelocity(new t.Vector3(0,0,0));
+                    //playerObject.setLinearVelocity(new t.Vector3(0,0,0));
                     
                     
                     if ( moveForward ) velocity.z -= 1000.0 * delta;
@@ -581,17 +595,17 @@
 					}
                     
                     
-                    
-                    detectCollision();
+                    if (!editor.hasPhysics)
+                        detectCollision();
                     
                     if (canMove){
-					controls.getObject().translateX( velocity.x * delta );
+					//controls.getObject().translateX( velocity.x * delta );
 					
-					controls.getObject().translateZ( velocity.z * delta );
+					//controls.getObject().translateZ( velocity.z * delta );
                     }
                     
                     
-                    controls.getObject().translateY( velocity.y * delta );
+                    //controls.getObject().translateY( velocity.y * delta );
                     
                     /*
                     console.log(controls.getObject().rotation.y);
@@ -601,9 +615,15 @@
                     console.log(player-Object.rotation.x);
                     console.log(playerObject.rotation.z);
                     */
-                    //playerObject.translateX(velocity.x * delta);
-                   // playerObject.translateY(velocity.y * delta);
-                    //playerObject.translateZ(velocity.z * delta);
+                    playerObject.translateX(velocity.x * delta);
+                    //playerObject.translateY(velocity.y * delta);
+                    playerObject.translateZ(velocity.z * delta);
+                    
+                    controls.getObject().position.x = playerObject.position.x;
+                    controls.getObject().position.y = playerObject.position.y;
+                    controls.getObject().position.z = playerObject.position.z;
+                    
+                    
                     
                     //console.log(controls.moveLeft);
                     
@@ -637,7 +657,7 @@
             
             
             function detectCollision() {
-               // unlockAllDirection();
+               
                 //canMove = false;
                 var rotationMatrix;
                 var cameraDirection = controls.getDirection(new THREE.Vector3(0, 0, 0)).clone();
@@ -646,7 +666,7 @@
                 cameraDirection.setY(0);
 
                 if (controls.moveForward) {
-                    //console.log("We do nothing"); // Nothing to do!
+                    //console.log("We do nothing"); 
                 }
                 else if (controls.moveBackward) {
                     rotationMatrix = new THREE.Matrix4();
@@ -675,7 +695,7 @@
                 else
                     canMove = true;
                 
-                    //lockDirection();
+                    
                     
                 
             }
@@ -689,7 +709,7 @@
                 mouse.y = - (e.clientY / HEIGHT) * 2 + 1;
             }
 
-            // Handle window resizing
+            
             $(window).resize(function() {
                 WIDTH = window.innerWidth;
                 HEIGHT = window.innerHeight;
@@ -701,22 +721,16 @@
                 if (renderer) {
                     renderer.setSize(WIDTH, HEIGHT);
                 }
-                //$('#intro, #hurt').css({width: WIDTH, height: HEIGHT,});
+                
             });
 
-            // Stop moving around when the window is unfocused (keeps my sanity!)
+            
             $(window).focus(function() {
                 if (controls) controls.freeze = false;
             });
             $(window).blur(function() {
                 if (controls) controls.freeze = true;
             });
-
-            //Get a random integer between lo and hi, inclusive.
-            //Assumes lo and hi are integers and lo is lower than hi.
-            function getRandBetween(lo, hi) {
-             return parseInt(Math.floor(Math.random()*(hi-lo+1))+lo, 10);
-            }
             
             function calcDegrees(radians)
             {

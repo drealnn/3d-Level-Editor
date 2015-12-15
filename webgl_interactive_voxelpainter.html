@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 	<head>
-		<title>three.js webgl - interactive - voxel painter</title>
+		<title>Level Editor - CAP 4720 - Daniel Sledd</title>
 		<meta charset="utf-8">
 		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
 		<style>
@@ -34,7 +34,7 @@
                 background:url(http://cdn1.iconfinder.com/data/icons/fatcow/16x16_0020/accept.png) 0 5px no-repeat;
             }
             
-            #gui { position: absolute; top: 60px; left: 85% }
+            #gui { position: absolute; top: 110px; left: 86.5% }
 
             
 		</style>
@@ -53,7 +53,7 @@
         <script src='js/libs/dat.gui.min.js'></script>
         <script src='gui.js'></script>
         
-        <!-- Shaders -->
+       
         <script type="x-shader/x-vertex" id="vertexshader">
 
             // switch on high precision floats
@@ -116,7 +116,7 @@
 
         </script>
 
-        <!-- End Shaders -->
+    
     
 
 		<script>
@@ -138,16 +138,22 @@
             var spawnBlock;
             var line;
             var initSize = 1000;
-            
+            var currentPlaneMaterial = 0;
             
             var t = THREE;
             var materials = [
-                                 new t.MeshLambertMaterial({/*color: 0x00CCAA,*/map: t.ImageUtils.loadTexture('textures/white-bricks.jpg')}),
-                                 new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/ground.jpg')}),
-                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/wood.jpg')}),
-                                new t.MeshLambertMaterial({/*color: 0xC5EDA0,*/map: t.ImageUtils.loadTexture('images/stone.png')}), 
-                                new t.MeshLambertMaterial({color: 0xFBEBCD})
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('textures/white-bricks.jpg')}),
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')}),
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/wood.jpg')}),
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/stone.png')}), 
+                new t.MeshLambertMaterial({color: 0xFBEBCD})
                                  ];
+            
+            var planeMaterials = [
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('images/ground.jpg')} ),
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('textures/snow.jpg')} ) ,
+                new t.MeshLambertMaterial({map: t.ImageUtils.loadTexture('textures/concrete.jpg')} ) 
+            ];
 
 			var objects = [];
             
@@ -159,6 +165,8 @@
                 SPAWN : 4
                 
             };
+            
+            var axis;
             
              
 			init();
@@ -221,8 +229,12 @@
 				info.style.position = 'absolute';
 				info.style.top = '10px';
 				info.style.width = '100%';
+                //info.style.height = '10%';
 				info.style.textAlign = 'center';
-				info.innerHTML = '<a href="http://threejs.org" target="_blank">three.js</a> - Level Editor <br><strong>click</strong>: add voxel, <strong>shift + click</strong>: remove voxel';
+                info.style.color = 'green';
+                info.style.fontSize = '20px';
+                info.style.backgroundColor = 'black';
+				info.innerHTML = 'Level Editor - Daniel Sledd <br><strong>click</strong>: add block, <strong>shift + click</strong>: remove block, Access GUI controls to change blocktype, in-game physics, and map size';
 				container.appendChild( info );
                 
                 /*
@@ -232,8 +244,8 @@
                 */
                 
                 
-				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 10000 );
-				camera.position.set( 500, 800, 1300 );
+				camera = new THREE.PerspectiveCamera( 45, window.innerWidth / window.innerHeight, 1, 20000 );
+				camera.position.set( 0, 800, 1300 );
 				camera.lookAt( new THREE.Vector3() );
 
 				scene = new THREE.Scene();
@@ -241,11 +253,16 @@
 				// roll-over helpers
 
 				rollOverGeo = new THREE.BoxGeometry( 50, 50, 50 );
-				rollOverMaterial = new THREE.MeshBasicMaterial( { color: 0xff0000, opacity: 0.5, transparent: true } );
+				rollOverMaterial = new THREE.MeshLambertMaterial( { color: 0xff0000, opacity: 0.5, transparent: true } );
 				rollOverMesh = new THREE.Mesh( rollOverGeo, rollOverMaterial );
 				scene.add( rollOverMesh );
                 
-                var axis = new THREE.AxisHelper();
+                axis = new THREE.AxisHelper(500);
+                axis.position.y += 25;
+                axis.position.x -= 1000;
+                axis.position.z -= 1000;
+                
+                //axis.position.x += 2;
                 scene.add(axis);
                 
 
@@ -278,7 +295,7 @@
 
 				}
 
-				var material = new THREE.LineBasicMaterial( { color: 0x000000, opacity: 0.2, transparent: true } );
+				var material = new THREE.LineBasicMaterial( { color: 0x000000, opacity: 0.2, transparent: false } );
 
 				line = new THREE.LineSegments( geometry, material );
 				scene.add( line );
@@ -291,7 +308,7 @@
 				var geometry = new THREE.PlaneBufferGeometry( 2000, 2000 );
 				geometry.rotateX( - Math.PI / 2 );
 
-				plane = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { visible: false } ) );
+				plane = new THREE.Mesh( geometry, materials[1]  ) ;
 				scene.add( plane );
 
 				objects.push( plane );
@@ -344,12 +361,12 @@
                 var clearButton = createButton("clear", "Clear Map", 50, 50, -window.innerHeight/2 + 25, window.innerWidth/2 - 250);
                 clearButton.addEventListener('click', clearScreen);
                 
-                var playButton = createButton("play", "Play Map", 50, 50, -window.innerHeight/2 + 50, 0);
+                var playButton = createButton("play", "Play Map", 50, 50, -window.innerHeight/2 + 70, -50);
                 playButton.addEventListener('click', openWindow);
                 
                 document.addEventListener( )
                 
-
+                loadSkyMap();
 				//
                 
                 //update();
@@ -368,6 +385,54 @@
                 requestAnimationFrame(update);
             }
             */
+            var skyboxMesh;
+            function loadSkyMap()
+            {
+                
+                if (skyboxMesh != null)
+                    scene.remove(skyboxMesh);
+                
+                var skymaptype;
+                if (skymap.Mountains)
+                    skymaptype = 'mountains';
+                else if (skymap.bluefreeze)
+                    skymaptype = 'bluefreeze';
+                else if (skymap.darkland)
+                    skymaptype = 'darkland';
+                else if (skymap.city)
+                    skymaptype = 'city';
+                else if (skymap.comawhite)
+                    skymaptype = 'comawhite';
+                else
+                    console.log("no value found");
+                
+                // skybox
+                var urlPrefix = "textures/" + skymaptype + "/";
+                var urls = [ urlPrefix + "right.jpg", urlPrefix + "left.jpg",
+                    urlPrefix + "top.jpg", urlPrefix + "top.jpg",
+                    urlPrefix + "front.jpg", urlPrefix + "back.jpg"];
+                var textureCube = THREE.ImageUtils.loadTextureCube( urls );
+
+                var shader = THREE.ShaderLib["cube"];
+                var uniforms = THREE.UniformsUtils.clone( shader.uniforms );
+                uniforms['tCube'].value = textureCube;   // textureCube has been init before
+                
+                var material = new THREE.ShaderMaterial({
+                    fragmentShader    : shader.fragmentShader,
+                    vertexShader  : shader.vertexShader,
+                    uniforms  : uniforms,
+                    depthWrite: false,
+                    side: THREE.DoubleSide
+                });
+                
+                // build the skybox Mesh 
+                skyboxMesh    = new THREE.Mesh( new THREE.BoxGeometry( 10000, 10000, 10000, 1, 1, 1), material );
+                // add it to the scene
+                scene.add( skyboxMesh );
+                updateSquareGrid(menu.Map_Size/2);
+                
+            }
+            
             
             function onExportClick()
             {
@@ -558,12 +623,12 @@
             function onDrop(event) {
 				event.preventDefault();
 				for(var i = 0; i < event.dataTransfer.files.length; i++){
-					var file	= event.dataTransfer.files[i];
-					var reader	= new FileReader();
+					var file = event.dataTransfer.files[i];
+					var reader = new FileReader();
 					reader.onload = function (event){
 						var dataUri	= event.target.result;
-						var base64	= dataUri.match(/[^,]*,(.*)/)[1];
-						var json	= window.atob(base64);
+						var base64 = dataUri.match(/[^,]*,(.*)/)[1];
+						var json = window.atob(base64);
 						loadJSON( json )
 					};
 					reader.readAsDataURL(file);
@@ -572,13 +637,14 @@
             var voxels;
             
             function saveJSON(openWindow) {
-				var children	= scene.children;
+				var children = scene.children;
 				 voxels	= [];
 				for( var i = 0; i < children.length; i++ ) {
-					var child	= children[i];
-					if( child instanceof THREE.Mesh === false )			continue;
-					if( child.geometry instanceof THREE.CubeGeometry === false )	continue;
-					if( child === rollOverMesh )					continue;
+					var child = children[i];
+					if( child instanceof THREE.Mesh === false ) continue;
+					if( child.geometry instanceof THREE.CubeGeometry === false ) continue;
+					if( child === rollOverMesh ) continue;
+                    if( child === skyboxMesh ) continue;
 					voxels.push({
 						x	: (child.position.x - 25) / 50,
 						y	: (child.position.y - 25) / 50,
@@ -590,8 +656,7 @@
 				
                 
                 
-				// open a window with the json
-                
+				// if we hit the export button, open a window with the json
                 if (openWindow)
                 {
                     var dataUri	= "data:application/json;charset=utf-8,"+JSON.stringify(voxels);
@@ -648,6 +713,8 @@
 					if( children[i].geometry instanceof THREE.CubeGeometry === false ) continue;
 					if( children[i] === rollOverMesh ) continue;
                     if( children[i] === spawnBlock) continue;
+                    if (children[i] == plane) continue;
+                    if (children[i] == skyboxMesh) continue;
                     
                     objects.splice(objects.indexOf(children[i]), 1);
 					scene.remove( children[i] );
