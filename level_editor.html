@@ -193,7 +193,7 @@
             function openWindow()
             {
                 saveJSON(false);
-                window.open('file2.html');
+                window.open('level.html');
             }
             
             function createButton(name, text, width, height, top, left)
@@ -364,7 +364,7 @@
                 var playButton = createButton("play", "Play Map", 50, 50, -window.innerHeight/2 + 70, -50);
                 playButton.addEventListener('click', openWindow);
                 
-                document.addEventListener( )
+                
                 
                 loadSkyMap();
 				//
@@ -671,6 +671,7 @@
 					if( children[i] instanceof THREE.Mesh === false ) continue;
 					if( children[i].geometry instanceof THREE.CubeGeometry === false ) continue;
 					if( children[i] === rollOverMesh ) continue;
+                    if (children[i] == skyboxMesh) continue;
                     
                     objects.splice(objects.indexOf(children[i]), 1);
 					scene.remove( children[i] );

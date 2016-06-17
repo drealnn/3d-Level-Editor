@@ -236,7 +236,7 @@
                 
 				// Set up camera
                 cam = new t.PerspectiveCamera(60, ASPECT, 1, 10000); // FOV, aspect, near, far
-                cam.position.y = 25;
+                cam.position.y = 30;
                 
                 
                 scene.add(cam);
@@ -251,7 +251,7 @@
                 controls = new THREE.PointerLockControls( cam );
                 controls.getObject().position.x = editor.spawnPoint.x;
                 controls.getObject().position.z = editor.spawnPoint.z;
-                controls.getObject().position.y = editor.spawnPoint.y;
+                controls.getObject().position.y = editor.spawnPoint.y += 25;
 				scene.add( controls.getObject() );
                 
                 controls.moveForward = false;
@@ -296,7 +296,7 @@
                 
                 
                 
-                scene.add(playerObject);
+                //scene.add(playerObject);
                 
                 
                 // Set up raycaster for jumping
@@ -573,10 +573,10 @@
                     
 					   velocity.y -= 9.8 * 100.0 * delta; // 100.0 = mass
                     
-                    playerObject.__dirtyPosition = true;
-                    playerObject.__dirtyRotation = true;
+                   // playerObject.__dirtyPosition = true;
+                    //playerObject.__dirtyRotation = true;
                     
-                    playerObject.rotation.y = controls.getObject().rotation.y;
+                    //playerObject.rotation.y = controls.getObject().rotation.y;
                     
                     //playerObject.setAngularVelocity(new t.Vector3(0,0,0));
                     //playerObject.setLinearVelocity(new t.Vector3(0,0,0));
@@ -595,17 +595,17 @@
 					}
                     
                     
-                    if (!editor.hasPhysics)
+                    
                         detectCollision();
                     
                     if (canMove){
-					//controls.getObject().translateX( velocity.x * delta );
+					controls.getObject().translateX( velocity.x * delta );
 					
-					//controls.getObject().translateZ( velocity.z * delta );
+					controls.getObject().translateZ( velocity.z * delta );
                     }
                     
                     
-                    //controls.getObject().translateY( velocity.y * delta );
+                    controls.getObject().translateY( velocity.y * delta );
                     
                     /*
                     console.log(controls.getObject().rotation.y);
@@ -615,21 +615,21 @@
                     console.log(player-Object.rotation.x);
                     console.log(playerObject.rotation.z);
                     */
-                    playerObject.translateX(velocity.x * delta);
+                    //playerObject.translateX(velocity.x * delta);
                     //playerObject.translateY(velocity.y * delta);
-                    playerObject.translateZ(velocity.z * delta);
+                    //playerObject.translateZ(velocity.z * delta);
                     
-                    controls.getObject().position.x = playerObject.position.x;
-                    controls.getObject().position.y = playerObject.position.y;
-                    controls.getObject().position.z = playerObject.position.z;
+                    //controls.getObject().position.x = playerObject.position.x;
+                    //controls.getObject().position.y = playerObject.position.y;
+                    //controls.getObject().position.z = playerObject.position.z;
                     
                     
                     
                     //console.log(controls.moveLeft);
                     
-					if ( controls.getObject().position.y < 10 ) {
+					if ( controls.getObject().position.y < 25 ) {
 						velocity.y = 0;
-						controls.getObject().position.y = 10;
+						controls.getObject().position.y = 25;
 						canJump = true;
 					}
                     
